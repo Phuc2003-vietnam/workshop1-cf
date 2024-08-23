@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create a VPC with 1 public subnets, 1 public IPV4 EC2, 1 routable, 1 IGW
+Parameters:
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    ConstraintDescription: "Can contain only ASCII characters."
+Resources:
+  # Create the VPC
+  VPCWithOneServer:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16" # Adjust CIDR block as needed
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServer
+
+  # Create the Internet Gateway
+  VPCWithOneServerMyInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServerMyInternetGateway
+
+  # Attach the Internet Gateway to the VPC
+  VPCWithOneServerAttachGateway:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref VPCWithOneServer
+      InternetGatewayId: !Ref VPCWithOneServerMyInternetGateway
+
+  # Create the first public subnet
+  VPCWithOneServerPublicSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPCWithOneServer
+      CidrBlock: "10.0.1.0/24" # Adjust CIDR block as needed
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServerPublicSubnet1
+
+  # Create a route table for the public subnets
+  VPCWithOneServerPublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPCWithOneServer
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServerPublicRouteTable
+
+  # Create a route to the Internet Gateway
+  VPCWithOneServerPublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: VPCWithOneServerAttachGateway
+    Properties:
+      RouteTableId: !Ref VPCWithOneServerPublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref VPCWithOneServerMyInternetGateway
+
+  # Associate the public route table with the first subnet
+  VPCWithOneServerPublicSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref VPCWithOneServerPublicSubnet1
+      RouteTableId: !Ref VPCWithOneServerPublicRouteTable
+
+  # Create a Security Group
+  VPCWithOneServerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !Ref VPCWithOneServer
+      GroupDescription: "Allow SSH, HTTP, HTTPS, ICMP, and port 3000 access"
+      SecurityGroupIngress:
+        - IpProtocol: "tcp"
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: "tcp"
+          FromPort: "3000"
+          ToPort: "3000"
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: "icmp"
+          FromPort: "-1"
+          ToPort: "-1"
+          CidrIp: "0.0.0.0/0"
+
+  # Create an EC2 instance
+  VPCWithOneServerEC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: "t2.micro" # Adjust instance type as needed
+      ImageId: "ami-0e86e20dae9224db8" # Replace with a valid Ubuntu AMI ID
+      SubnetId: !Ref VPCWithOneServerPublicSubnet1
+      SecurityGroupIds:
+        - !Ref VPCWithOneServerSecurityGroup
+      KeyName: !Ref KeyName
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServerEC2Instance
