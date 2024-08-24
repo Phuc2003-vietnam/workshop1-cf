@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Create a VPC with 1 public subnets, 1 public IPV4 EC2, 1 routable, 1 IGW
+Description: Create a VPC with 2 public subnets, 1 public IPV4 EC2, 1 routable, 1 IGW
 Parameters:
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
@@ -44,6 +44,18 @@ Resources:
         - Key: Name
           Value: VPCWithOneServerPublicSubnet1
 
+  # Create the second public subnet
+  VPCWithOneServerPublicSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPCWithOneServer
+      CidrBlock: "10.0.2.0/24" # Adjust CIDR block as needed
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: VPCWithOneServerPublicSubnet2
+
   # Create a route table for the public subnets
   VPCWithOneServerPublicRouteTable:
     Type: "AWS::EC2::RouteTable"
@@ -61,12 +73,19 @@ Resources:
       RouteTableId: !Ref VPCWithOneServerPublicRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref VPCWithOneServerMyInternetGateway
-
+  
   # Associate the public route table with the first subnet
   VPCWithOneServerPublicSubnet1RouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       SubnetId: !Ref VPCWithOneServerPublicSubnet1
+      RouteTableId: !Ref VPCWithOneServerPublicRouteTable
+
+  # Associate the public route table with the second subnet
+  VPCWithOneServerPublicSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref VPCWithOneServerPublicSubnet2
       RouteTableId: !Ref VPCWithOneServerPublicRouteTable
 
   # Create a Security Group
